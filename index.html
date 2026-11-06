@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>株チャート分析｜クラウド版（仮想売買）</title>
+<link rel="apple-touch-icon" href="icon.png">
+<link rel="icon" type="image/png" href="icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="株分析">
+<meta name="theme-color" content="#1a1a19">
+<script src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
+<style>
+  :root{
+    --bg:#121211; --surface:#1a1a19; --surface2:#222220; --border:#33332f;
+    --text:#ffffff; --text2:#c3c2b7; --muted:#8b8a80;
+    --ma5:#3987e5; --ma25:#c98500; --ma75:#9085e9; --ma200:#d55181;
+    --up:#e66767; --down:#199e70; --warn:#fab219;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:-apple-system,'Hiragino Sans','Noto Sans JP',sans-serif;font-size:14px;line-height:1.6}
+  header{display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:14px 20px;border-bottom:1px solid var(--border);background:var(--surface)}
+  header h1{font-size:17px;font-weight:700}
+  header .beta{font-size:11px;color:var(--muted);border:1px solid var(--border);border-radius:4px;padding:1px 6px}
+  #marketBar{display:flex;flex-wrap:wrap;gap:8px;margin-left:auto;align-items:center;font-size:12px}
+  .mchip{background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:3px 8px;color:var(--text2)}
+  .mchip b{color:var(--text);font-weight:600}
+  .verdict{border-radius:6px;padding:3px 10px;font-weight:700;font-size:12px}
+  .v-buy{background:rgba(230,103,103,.15);color:var(--up);border:1px solid var(--up)}
+  .v-sell{background:rgba(25,158,112,.15);color:var(--down);border:1px solid var(--down)}
+  .v-neutral{background:rgba(250,178,25,.12);color:var(--warn);border:1px solid var(--warn)}
+  nav{display:flex;gap:4px;padding:10px 20px 0}
+  nav button{background:none;border:none;color:var(--text2);font-size:14px;padding:8px 14px;cursor:pointer;border-bottom:2px solid transparent}
+  nav button.on{color:var(--text);font-weight:700;border-bottom-color:var(--ma5)}
+  main{padding:16px 20px;max-width:1280px;margin:0 auto}
+  .tab{display:none}.tab.on{display:block}
+  .searchRow{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px}
+  .searchRow input{flex:1;min-width:220px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:10px 12px;font-size:15px}
+  .btn{background:var(--ma5);border:none;color:#fff;border-radius:8px;padding:10px 18px;font-size:14px;font-weight:700;cursor:pointer}
+  .btn:disabled{opacity:.5;cursor:default}
+  .chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px}
+  .chips button{background:var(--surface2);border:1px solid var(--border);border-radius:14px;color:var(--text2);padding:4px 12px;font-size:12px;cursor:pointer}
+  .chips button:hover{color:var(--text);border-color:var(--muted)}
+  .grid{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:14px}
+  @media(max-width:960px){.grid{grid-template-columns:1fr}}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:14px}
+  .card h3{font-size:13px;color:var(--muted);font-weight:600;margin-bottom:8px;letter-spacing:.04em}
+  #titleRow{display:flex;flex-wrap:wrap;align-items:baseline;gap:10px;margin-bottom:8px}
+  #titleRow .nm{font-size:20px;font-weight:800}
+  #titleRow .px{font-size:20px;font-weight:700}
+  .pos{color:var(--up)} .neg{color:var(--down)}
+  #legend{display:flex;flex-wrap:wrap;gap:12px;font-size:12px;color:var(--text2);margin:6px 0}
+  #legend label{display:flex;align-items:center;gap:5px;cursor:pointer}
+  .dot{width:10px;height:10px;border-radius:3px;display:inline-block}
+  #ohlc{font-size:12px;color:var(--text2);min-height:18px;font-variant-numeric:tabular-nums}
+  #chart{position:relative;height:420px}
+  .sigCard{border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:8px;background:var(--surface2)}
+  .sigCard .head{display:flex;align-items:center;gap:8px;font-weight:700}
+  .badge{font-size:11px;border-radius:4px;padding:1px 7px;font-weight:700}
+  .b-buy{background:rgba(230,103,103,.18);color:var(--up)}
+  .b-sell{background:rgba(25,158,112,.18);color:var(--down)}
+  .sigCard .stats{font-size:12px;color:var(--text2);margin-top:4px}
+  .sigCard .desc{font-size:12px;color:var(--muted);margin-top:4px}
+  ul.explain{padding-left:18px;font-size:13px;color:var(--text2)}
+  ul.explain li{margin-bottom:4px}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th{color:var(--muted);font-weight:600;text-align:left;padding:6px 8px;border-bottom:1px solid var(--border);white-space:nowrap}
+  td{padding:7px 8px;border-bottom:1px solid var(--border);white-space:nowrap}
+  tr.click{cursor:pointer} tr.click:hover{background:var(--surface2)}
+  .tableWrap{overflow-x:auto}
+  .stat{display:flex;flex-direction:column;gap:2px}
+  .stat .v{font-size:20px;font-weight:800;font-variant-numeric:tabular-nums}
+  .stat .k{font-size:11px;color:var(--muted)}
+  .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:14px}
+  .tradeRow{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px}
+  .tradeRow input{width:90px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:8px;font-size:14px}
+  .btn.buy{background:var(--up)} .btn.sell{background:var(--down)}
+  #toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px 18px;display:none;z-index:9;max-width:90vw}
+  .spin{color:var(--muted);padding:30px;text-align:center}
+  footer{color:var(--muted);font-size:11px;padding:20px;text-align:center;border-top:1px solid var(--border);margin-top:20px}
+  details summary{cursor:pointer;color:var(--muted);font-size:12px;margin-top:8px}
+  .kv{display:grid;grid-template-columns:auto 1fr;gap:2px 14px;font-size:13px}
+  .kv .k{color:var(--muted)} .kv .v{color:var(--text2);text-align:right}
+  .news a{color:var(--ma5);font-size:12px;text-decoration:none;display:block;margin-bottom:5px}
+</style>
+</head>
+<body>
+<header>
+  <h1>📈 株チャート分析</h1><span class="beta">☁️クラウド版・仮想売買</span>
+  <div id="marketBar"><span class="mchip">読込中…</span></div>
+</header>
+<nav>
+  <button class="on" data-tab="analyzeTab">ホーム</button>
+  <button data-tab="screenTab">今日のシグナル</button>
+  <button data-tab="pfTab">仮想ポートフォリオ</button>
+</nav>
+<main>
+  <section id="analyzeTab" class="tab on">
+    <div class="searchRow">
+      <input id="q" placeholder="銘柄名 or 証券コード（例：キオクシア / 285A / 7203 / 日経平均）" onkeydown="if(event.key==='Enter')doAnalyze()">
+      <button class="btn" onclick="doAnalyze()">一発分析</button>
+    </div>
+    <div class="chips">
+      <button onclick="quick('285A')">キオクシア</button>
+      <button onclick="quick('7203')">トヨタ</button>
+      <button onclick="quick('6758')">ソニーG</button>
+      <button onclick="quick('8306')">三菱UFJ</button>
+      <button onclick="quick('9984')">ソフトバンクG</button>
+      <button onclick="quick('日経平均')">日経平均</button>
+      <button onclick="quick('ドル円')">ドル円</button>
+    </div>
+    <div id="analyzeBody"><div class="spin">読込中…</div></div>
+  </section>
+
+  <section id="screenTab" class="tab">
+    <div class="card">
+      <h3>今日のシグナル銘柄（主要<span id="uniN">—</span>銘柄から自動抽出・直近3営業日）</h3>
+      <div id="screenMeta" style="color:var(--muted);font-size:12px;margin-bottom:8px"></div>
+      <div id="screenBody"></div>
+    </div>
+  </section>
+
+  <section id="pfTab" class="tab">
+    <div id="pfBody"><div class="spin">読込中…</div></div>
+  </section>
+</main>
+<div id="toast"></div>
+<footer>
+  データ：Yahoo Finance終値ベース・毎営業日 朝8:30と15:40（日本時間）に自動更新｜「的中率」「平均リターン」は過去実績の統計であり将来の成果を保証しません｜
+  このページは参考情報であり投資勧誘・投資助言ではありません｜仮想売買＝実際のお金は動きません（データはこの端末の中にだけ保存されます）
+</footer>
+
+<script>
+const $ = id => document.getElementById(id);
+const fmt = (v,d=0) => v==null ? "—" : Number(v).toLocaleString("ja-JP",{maximumFractionDigits:d,minimumFractionDigits:0});
+const pct = v => v==null ? "—" : (v>0?"+":"")+Number(v).toFixed(2)+"%";
+const cls = v => v>0?"pos":v<0?"neg":"";
+function toast(msg){const t=$("toast");t.textContent=msg;t.style.display="block";setTimeout(()=>t.style.display="none",4000);}
+
+let HOME=null, curData=null, curCode=null;
+let chart, candles, maSeries={};
+
+const IDX = {"日経平均":"n225","日経":"n225","ドル円":"usdjpy","S&P500":"gspc","S&P":"gspc","N225":"n225","USDJPY":"usdjpy","GSPC":"gspc"};
+
+async function fetchJson(path){
+  const res = await fetch(path, {cache:"no-store"});
+  if(!res.ok) throw new Error(res.status);
+  return res.json();
+}
+
+/* ---- タブ ---- */
+document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>{
+  document.querySelectorAll("nav button").forEach(x=>x.classList.remove("on"));
+  document.querySelectorAll(".tab").forEach(x=>x.classList.remove("on"));
+  b.classList.add("on"); $(b.dataset.tab).classList.add("on");
+  if(b.dataset.tab==="pfTab") loadPf();
+  if(b.dataset.tab==="screenTab") renderScreen();
+});
+
+/* ---- 起動 ---- */
+(async()=>{
+  try{ HOME = await fetchJson("data/home.json"); }
+  catch(e){ $("analyzeBody").innerHTML=`<div class="spin">⚠️ データを読み込めませんでした。少し待って再読み込みしてください。</div>`; return; }
+  const m = HOME.market || {rows:[]};
+  const chips = (m.rows||[]).filter(r=>!r.error).map(r=>
+    `<span class="mchip">${r.name} <b>${fmt(r.close,2)}</b> <span class="${cls(r.chg_pct)}">${pct(r.chg_pct)}</span></span>`).join("");
+  $("marketBar").innerHTML = chips + (m.verdict?`<span class="verdict v-${m.side}">${m.verdict}</span>`:"");
+  $("uniN").textContent = HOME.universe;
+  $("screenMeta").textContent = `${HOME.date} ${HOME.generated} 更新`;
+  const q = new URLSearchParams(location.search).get("q");
+  if(q){ $("q").value=q; doAnalyze(); } else { renderHome(); }
+})();
+
+/* ---- ホーム ---- */
+function renderHome(){
+  const medals=["🥇","🥈","🥉"];
+  const picks = HOME.picks||[];
+  const picksHtml = picks.length ? picks.map((p,i)=>`
+    <div class="sigCard" style="cursor:pointer" onclick="quick('${p.code}')">
+      <div class="head" style="font-size:16px;flex-wrap:wrap">${medals[i]} ${p.name} <span style="color:var(--muted);font-weight:400">${p.code}</span>
+        <span style="margin-left:auto">${fmt(p.close,1)}円 <span class="${cls(p.chg_pct)}">${pct(p.chg_pct)}</span></span></div>
+      <div class="stats">${p.basis}｜過去<b>${p.n}回</b>・的中率<b>${(p.hit_rate*100).toFixed(0)}%</b>・平均<b class="pos">${pct(p.expected*100)}</b>（${p.horizon}営業日後）</div>
+      <div class="stats">目標 <b>${fmt(p.target,1)}円</b> ／ 損切り <b>${fmt(p.stop,1)}円</b>　<span style="color:var(--ma5)">タップで詳細分析 →</span></div>
+    </div>`).join("")
+    : `<div style="color:var(--text2);font-size:13px">今日は的中率55%以上の「自信あり買い場」が見つかりませんでした。<br>無理に買わないのが正解の日です。売買サイン一覧は「今日のシグナル」タブへ。</div>`;
+  const newsHtml = (HOME.news||[]).length ? HOME.news.map(n=>
+    `<a href="${n.url}" target="_blank" rel="noopener">・${n.title}</a><div style="color:var(--muted);font-size:10px;margin:-4px 0 6px 14px">${n.source}　${n.time}</div>`).join("")
+    : `<div style="color:var(--muted);font-size:13px">ニュースなし</div>`;
+  $("analyzeBody").innerHTML = `
+    <div class="grid">
+      <div class="card"><h3>🏆 今日のイチオシ（過去10年の検証で採点・${HOME.date} ${HOME.generated} 更新）</h3>${picksHtml}</div>
+      <div class="card news"><h3>📰 経済ニュース（NHK・Yahoo!）</h3>${newsHtml}</div>
+    </div>`;
+}
+
+/* ---- 銘柄分析 ---- */
+function resolveQ(q){
+  q=(q||"").trim(); if(!q) return null;
+  const qu=q.toUpperCase();
+  for(const k in IDX){ if(q.includes(k)||qu===k) return {file:IDX[k], code:null}; }
+  const uni = HOME ? HOME.universe_list : [];
+  if(/^[0-9][0-9A-Z]{3}$/.test(qu)){
+    if(uni.some(u=>u[0]===qu)) return {file:qu, code:qu};
+    return {missing:qu};
+  }
+  const hit = uni.find(u=>u[1].includes(q));
+  return hit ? {file:hit[0], code:hit[0]} : null;
+}
+function quick(q){ $("q").value=q; doAnalyze(); }
+
+async function doAnalyze(){
+  const q = $("q").value.trim(); if(!q||!HOME) return;
+  const r = resolveQ(q);
+  if(!r){ toast(`「${q}」が見つかりません（銘柄名かコードで入力）`); return; }
+  if(r.missing){ $("analyzeBody").innerHTML=`<div class="spin">⚠️ クラウド版は主要${HOME.universe}銘柄＋指数のみ対応です（${r.missing} は対象外）。<br>全銘柄のその場分析はMac版アプリでできます。</div>`; return; }
+  $("analyzeBody").innerHTML = `<div class="spin">読込中…</div>`;
+  try{ curData = await fetchJson(`data/stocks/${r.file}.json`); }
+  catch(e){ $("analyzeBody").innerHTML=`<div class="spin">⚠️ データが見つかりませんでした</div>`; return; }
+  curCode = r.code;
+  renderAnalysis(curData);
+}
+
+function renderAnalysis(r){
+  const p = r.prediction, co = r.company;
+  const stanceCls = r.stance_side==="buy"?"v-buy":r.stance_side==="sell"?"v-sell":"v-neutral";
+  const isIndex = !curCode;
+  const sigCards = r.signals.length ? r.signals.map(s=>{
+    const st = s.stats;
+    return `<div class="sigCard">
+      <div class="head"><span class="badge ${s.side==="buy"?"b-buy":"b-sell"}">${s.side==="buy"?"買いサイン":"売りサイン"}</span>${s.name}</div>
+      <div class="stats">${st
+        ? `過去<b>${st.n}回</b>発生 → ${st.horizon}営業日後 的中率<b>${(st.hit_rate*100).toFixed(0)}%</b>・平均<b class="${cls(st.avg)}">${pct(st.avg*100)}</b>（最高${pct(st.best*100)} / 最低${pct(st.worst*100)}）`
+        : "過去の発生回数が少なく統計を出せません"}　<span style="color:var(--muted)">発生日 ${s.fired}</span></div>
+      <div class="desc">${s.desc}</div>
+    </div>`;}).join("")
+    : `<div class="sigCard"><div class="desc">直近3営業日に新しいシグナルはありません。</div></div>`;
+
+  const predHtml = p ? `
+      <div class="tiles">
+        ${p.target?`<div class="stat"><span class="v ${p.side==="buy"?"pos":"neg"}">${fmt(p.target,1)}円</span><span class="k">${p.horizon}営業日メド ${p.side==="buy"?"目標":"想定"}価格</span></div>`:""}
+        ${p.stop?`<div class="stat"><span class="v">${fmt(p.stop,1)}円</span><span class="k">損切りライン</span></div>`:""}
+        <div class="stat"><span class="v">${(p.hit_rate*100).toFixed(0)}%</span><span class="k">過去の的中率（${p.n}回中）</span></div>
+      </div>
+      <div style="font-size:12px;color:var(--text2)">${p.note}</div>`
+    : `<div style="font-size:13px;color:var(--text2)">いまは統計的に優位なサインが出ていないため、目標価格は出しません（様子見）。</div>`;
+
+  const kv = (k,v)=> v!=null && v!=="" ? `<span class="k">${k}</span><span class="v">${v}</span>` : "";
+  const coHtml = co ? `<div class="card"><h3>企業情報</h3>
+      <div class="kv">
+        ${kv("正式名",co.long_name)}${kv("セクター",co.sector)}${kv("業種",co.industry)}
+        ${kv("時価総額",co.market_cap)}${kv("PER（実績）",co.per?Number(co.per).toFixed(1)+"倍":null)}
+        ${kv("PER（予想）",co.forward_per?Number(co.forward_per).toFixed(1)+"倍":null)}
+        ${kv("PBR",co.pbr?Number(co.pbr).toFixed(2)+"倍":null)}
+        ${kv("配当利回り",co.dividend_yield!=null?co.dividend_yield+"%":null)}
+        ${kv("ROE",co.roe!=null?co.roe+"%":null)}${kv("売上高",co.revenue)}
+        ${kv("52週高値",co.high52?fmt(co.high52,1)+"円":null)}${kv("52週安値",co.low52?fmt(co.low52,1)+"円":null)}
+        ${kv("次回決算",co.earnings_date?co.earnings_date+" ⚠️決算またぎ注意":null)}
+      </div>
+      ${co.news && co.news.length?`<div class="news" style="margin-top:8px">${co.news.map(n=>`<a href="${n.url||"#"}" target="_blank" rel="noopener">・${n.title}</a>`).join("")}</div>`:""}
+    </div>` : "";
+
+  const tradeHtml = !isIndex ? `<div class="card"><h3>仮想売買（練習モード・実際のお金は動きません）</h3>
+      <div id="pfCash" style="font-size:12px;color:var(--muted)"></div>
+      <div class="tradeRow">
+        <input id="qty" type="number" value="100" min="1" step="100"> 株
+        <button class="btn buy" onclick="order('buy')">買う</button>
+        <button class="btn sell" onclick="order('sell')">売る</button>
+      </div>
+      <div style="font-size:11px;color:var(--muted);margin-top:6px">約定価格は最新の終値。買うと予測の損切り・目標ラインも一緒に記録されます。データはこの端末内だけに保存。</div>
+    </div>` : "";
+
+  const rows = r.chart.dates.slice(-10).map((d,j)=>{
+    const i = r.chart.dates.length-10+j;
+    return `<tr><td>${d}</td><td>${fmt(r.chart.open[i],1)}</td><td>${fmt(r.chart.high[i],1)}</td><td>${fmt(r.chart.low[i],1)}</td><td>${fmt(r.chart.close[i],1)}</td><td>${fmt(r.chart.volume[i])}</td></tr>`;
+  }).join("");
+
+  $("analyzeBody").innerHTML = `
+  <div class="grid">
+    <div>
+      <div class="card">
+        <div id="titleRow">
+          <span class="nm">${r.name}</span>
+          <span style="color:var(--muted)">${r.symbol}</span>
+          <span class="px">${fmt(r.close,r.close<100?2:1)}</span>
+          <span class="${cls(r.chg)}">${r.chg>0?"+":""}${fmt(r.chg,2)}（${pct(r.chg_pct)}）</span>
+          <span class="verdict ${stanceCls}">${r.stance}</span>
+          <span style="color:var(--muted);font-size:11px">${r.last_date}時点</span>
+        </div>
+        <div id="legend">
+          <label><input type="checkbox" checked data-ma="sma5"><span class="dot" style="background:var(--ma5)"></span>5日線</label>
+          <label><input type="checkbox" checked data-ma="sma25"><span class="dot" style="background:var(--ma25)"></span>25日線</label>
+          <label><input type="checkbox" checked data-ma="sma75"><span class="dot" style="background:var(--ma75)"></span>75日線</label>
+          <label><input type="checkbox" checked data-ma="sma200"><span class="dot" style="background:var(--ma200)"></span>200日線</label>
+          <span style="color:var(--muted)">▲買いサイン ▼売りサイン ｜ 赤=陽線 緑=陰線</span>
+        </div>
+        <div id="ohlc"></div>
+        <div id="chart"></div>
+        <details><summary>直近10営業日のデータを表で見る</summary>
+          <div class="tableWrap"><table><tr><th>日付</th><th>始値</th><th>高値</th><th>安値</th><th>終値</th><th>出来高</th></tr>${rows}</table></div>
+        </details>
+      </div>
+      ${coHtml}
+    </div>
+    <div>
+      <div class="card"><h3>AI判定と予測（過去10年の統計ベース）</h3>${predHtml}</div>
+      <div class="card"><h3>アクティブなシグナル</h3>${sigCards}</div>
+      <div class="card"><h3>いまのチャート状態（根拠）</h3><ul class="explain">${r.explanation.map(e=>`<li>${e}</li>`).join("")}</ul></div>
+      ${tradeHtml}
+    </div>
+  </div>`;
+  drawChart(r);
+  if(!isIndex) refreshCashLine();
+}
+
+function drawChart(r){
+  const el = $("chart"); el.innerHTML="";
+  chart = LightweightCharts.createChart(el,{
+    autoSize:true,
+    layout:{background:{color:"transparent"},textColor:"#c3c2b7",fontSize:11},
+    grid:{vertLines:{color:"#262623"},horzLines:{color:"#262623"}},
+    crosshair:{mode:LightweightCharts.CrosshairMode.Normal},
+    rightPriceScale:{borderColor:"#33332f"},
+    timeScale:{borderColor:"#33332f"},
+  });
+  candles = chart.addCandlestickSeries({
+    upColor:"#e66767",wickUpColor:"#e66767",borderUpColor:"#e66767",
+    downColor:"#199e70",wickDownColor:"#199e70",borderDownColor:"#199e70",
+  });
+  const d = r.chart;
+  candles.setData(d.dates.map((t,i)=>({time:t,open:d.open[i],high:d.high[i],low:d.low[i],close:d.close[i]})));
+  const colors = {sma5:"#3987e5",sma25:"#c98500",sma75:"#9085e9",sma200:"#d55181"};
+  maSeries = {};
+  for(const k of Object.keys(colors)){
+    maSeries[k] = chart.addLineSeries({color:colors[k],lineWidth:2,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false});
+    maSeries[k].setData(d.dates.map((t,i)=>({time:t,value:d[k][i]})).filter(x=>x.value!=null));
+  }
+  if(d.volume.some(v=>v>0)){
+    const vol = chart.addHistogramSeries({priceScaleId:"",priceFormat:{type:"volume"},lastValueVisible:false,priceLineVisible:false});
+    chart.priceScale("").applyOptions({scaleMargins:{top:0.82,bottom:0}});
+    vol.setData(d.dates.map((t,i)=>({time:t,value:d.volume[i],
+      color:(d.close[i]>=d.open[i])?"rgba(230,103,103,.35)":"rgba(25,158,112,.35)"})));
+  }
+  candles.setMarkers(d.markers.map(m=>({
+    time:m.date, position:m.side==="buy"?"belowBar":"aboveBar",
+    shape:m.side==="buy"?"arrowUp":"arrowDown",
+    color:m.side==="buy"?"#e66767":"#199e70", text:"",
+  })).sort((a,b)=>a.time<b.time?-1:1));
+  chart.timeScale().setVisibleLogicalRange({from:d.dates.length-130,to:d.dates.length+2});
+  chart.subscribeCrosshairMove(param=>{
+    const c = param.seriesData && param.seriesData.get(candles);
+    $("ohlc").textContent = c ? `${param.time}　始 ${fmt(c.open,1)}　高 ${fmt(c.high,1)}　安 ${fmt(c.low,1)}　終 ${fmt(c.close,1)}` : "";
+  });
+  document.querySelectorAll("#legend input[data-ma]").forEach(cb=>{
+    cb.onchange = ()=> maSeries[cb.dataset.ma].applyOptions({visible:cb.checked});
+  });
+}
+
+/* ---- 仮想売買（localStorage：この端末専用の口座） ---- */
+function pfLoad(){
+  try{ const pf = JSON.parse(localStorage.kabuPf); if(pf && pf.positions) return pf; }catch(e){}
+  return {cash:10000000, initial:10000000, positions:{}, history:[]};
+}
+function pfSave(pf){ localStorage.kabuPf = JSON.stringify(pf); }
+
+function refreshCashLine(){
+  const pf = pfLoad();
+  const el = $("pfCash");
+  if(el) el.textContent = `仮想資金（この端末）：${fmt(pf.cash)}円`;
+}
+
+function order(side){
+  if(!curData || !curCode) return;
+  const qty = Number($("qty").value)||0;
+  if(qty<=0){ toast("数量を入れてください"); return; }
+  const price = curData.close;
+  const pf = pfLoad();
+  const now = new Date().toLocaleString("ja-JP",{month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit"});
+  if(side==="buy"){
+    const cost = price*qty;
+    if(cost > pf.cash){ toast(`⚠️ 仮想資金が足りません（必要 ${fmt(cost)}円 / 残り ${fmt(pf.cash)}円）`); return; }
+    const pos = pf.positions[curCode];
+    if(pos){
+      const tq = pos.qty+qty;
+      pos.avg_price = Math.round((pos.avg_price*pos.qty + cost)/tq*100)/100;
+      pos.qty = tq;
+    }else{
+      const pr = curData.prediction;
+      pf.positions[curCode] = {code:curCode, name:curData.name, qty, avg_price:price,
+        stop:(pr&&pr.side==="buy")?pr.stop:null, target:(pr&&pr.side==="buy")?pr.target:null, opened:now};
+    }
+    pf.cash -= cost;
+    pf.history.push({time:now, side:"買", code:curCode, name:curData.name, qty, price, amount:Math.round(cost)});
+  }else{
+    const pos = pf.positions[curCode];
+    if(!pos || pos.qty < qty){ toast("⚠️ 保有数量が足りません"); return; }
+    const proceeds = price*qty;
+    const pl = (price - pos.avg_price)*qty;
+    const plp = Math.round(pl/(pos.avg_price*qty)*10000)/100;
+    pos.qty -= qty;
+    if(pos.qty===0) delete pf.positions[curCode];
+    pf.cash += proceeds;
+    pf.history.push({time:now, side:"売", code:curCode, name:curData.name, qty, price, amount:Math.round(proceeds), pl:Math.round(pl), pl_pct:plp});
+  }
+  pfSave(pf);
+  toast(`✅ 仮想${side==="buy"?"買い":"売り"}約定：${curData.name} ${fmt(qty)}株 @${fmt(price,1)}円`);
+  refreshCashLine();
+}
+
+async function loadPf(){
+  $("pfBody").innerHTML = `<div class="spin">読込中…</div>`;
+  const pf = pfLoad();
+  const codes = Object.keys(pf.positions);
+  const prices = {};
+  await Promise.all(codes.map(async c=>{
+    try{ prices[c] = (await fetchJson(`data/stocks/${c}.json`)).close; }
+    catch(e){ prices[c] = pf.positions[c].avg_price; }
+  }));
+  let total = pf.cash;
+  const posRows = codes.map(c=>{
+    const p = pf.positions[c];
+    const price = prices[c];
+    const value = price*p.qty, pl = value - p.avg_price*p.qty;
+    total += value;
+    const plp = Math.round(pl/(p.avg_price*p.qty)*10000)/100;
+    const gap = p.stop ? Math.round((price/p.stop-1)*10000)/100 : null;
+    return `<tr class="click" onclick="quick('${c}');document.querySelector('nav button[data-tab=analyzeTab]').click()">
+      <td><b>${p.name}</b> <span style="color:var(--muted)">${c}</span></td>
+      <td>${fmt(p.qty)}</td><td>${fmt(p.avg_price,1)}</td><td>${fmt(price,1)}</td>
+      <td class="${cls(pl)}">${fmt(pl)}円（${pct(plp)}）</td>
+      <td>${p.stop?fmt(p.stop,1)+"円"+(gap!=null&&gap<2?" ⚠️接近":""):"—"}</td>
+      <td>${p.target?fmt(p.target,1)+"円":"—"}</td></tr>`;
+  }).join("");
+  const histRows = pf.history.slice(-30).reverse().map(h=>`
+    <tr><td>${h.time}</td><td>${h.side}</td><td>${h.name} <span style="color:var(--muted)">${h.code}</span></td>
+    <td>${fmt(h.qty)}</td><td>${fmt(h.price,1)}</td><td>${fmt(h.amount)}</td>
+    <td class="${cls(h.pl)}">${h.pl!=null?fmt(h.pl)+"円（"+pct(h.pl_pct)+"）":"—"}</td></tr>`).join("");
+  const tpl = total - pf.initial;
+  $("pfBody").innerHTML = `
+    <div class="tiles">
+      <div class="card stat"><span class="v">${fmt(total)}円</span><span class="k">仮想総資産（初期 ${fmt(pf.initial)}円・この端末専用）</span></div>
+      <div class="card stat"><span class="v ${cls(tpl)}">${tpl>0?"+":""}${fmt(tpl)}円</span><span class="k">トータル損益（${pct(Math.round(tpl/pf.initial*10000)/100)}）</span></div>
+      <div class="card stat"><span class="v">${fmt(pf.cash)}円</span><span class="k">現金（買付余力）</span></div>
+    </div>
+    <div class="card"><h3>保有ポジション</h3>${codes.length?`<div class="tableWrap"><table>
+      <tr><th>銘柄</th><th>数量</th><th>平均取得</th><th>現在値</th><th>評価損益</th><th>損切りライン</th><th>目標</th></tr>${posRows}</table></div>`
+      :`<div style="color:var(--muted)">保有なし。「ホーム」から銘柄を選んで仮想で買ってみてください。</div>`}</div>
+    <div class="card"><h3>売買履歴（直近30件）</h3>${pf.history.length?`<div class="tableWrap"><table>
+      <tr><th>日時</th><th>売買</th><th>銘柄</th><th>数量</th><th>約定価格</th><th>金額</th><th>実現損益</th></tr>${histRows}</table></div>`
+      :`<div style="color:var(--muted)">まだ取引がありません。</div>`}</div>`;
+}
+
+/* ---- スクリーニング ---- */
+function renderScreen(){
+  if(!HOME){ return; }
+  const results = HOME.results||[];
+  if(!results.length){ $("screenBody").innerHTML=`<div class="spin">直近3営業日にシグナルが出た銘柄はありません</div>`; return; }
+  const rows = results.map(x=>`
+    <tr class="click" onclick="quick('${x.code}');document.querySelector('nav button[data-tab=analyzeTab]').click()">
+      <td><b>${x.name}</b> <span style="color:var(--muted)">${x.code}</span></td>
+      <td>${fmt(x.close,1)}</td><td class="${cls(x.chg_pct)}">${pct(x.chg_pct)}</td>
+      <td>${x.signals.map(s=>`<span class="badge ${s.side==="buy"?"b-buy":"b-sell"}">${s.side==="buy"?"買":"売"}</span> ${s.name}（${s.fired}）`).join("<br>")}</td>
+    </tr>`).join("");
+  $("screenBody").innerHTML = `<div class="tableWrap"><table>
+    <tr><th>銘柄（クリックで分析）</th><th>終値</th><th>前日比</th><th>シグナル</th></tr>${rows}</table></div>`;
+}
+</script>
+</body>
+</html>
